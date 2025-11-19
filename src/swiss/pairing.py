@@ -34,7 +34,7 @@ def pair_round_1(
         List of Match objects for Round 1
 
     Raises:
-        ValueError: If registrations list is empty
+        ValueError: If registrations list is empty or too small
     """
     if not registrations:
         raise ValueError("Cannot pair empty player list")
@@ -47,6 +47,13 @@ def pair_round_1(
 
     if not active_players:
         raise ValueError("No active players to pair")
+
+    # Minimum tournament size: 2 players
+    if len(active_players) < 2:
+        raise ValueError(
+            f"Swiss tournament requires at least 2 players. "
+            f"Currently have {len(active_players)} active player(s)."
+        )
 
     # Sort/shuffle based on mode
     if mode == "random":
@@ -182,6 +189,14 @@ def pair_round(
     if not active_players:
         raise ValueError("No active players to pair")
 
+    # Minimum tournament size: 2 players
+    if len(active_players) < 2:
+        raise ValueError(
+            f"Swiss tournament requires at least 2 players. "
+            f"Currently have {len(active_players)} active player(s). "
+            f"Tournament may have ended due to drops."
+        )
+
     # Calculate current standings
     standings = calculate_standings(active_players, matches, config)
 
@@ -224,10 +239,13 @@ def pair_round(
         new_matches.extend(paired)
         unpaired_players = unpaired
 
-    # Handle any remaining unpaired players (shouldn't happen with proper algorithm)
+    # Handle any remaining unpaired players
     if len(unpaired_players) > 0:
-        raise ValueError(
-            f"Failed to pair {len(unpaired_players)} players - algorithm error"
+        # This means we couldn't pair some players - check if it's truly impossible
+        _raise_impossible_pairing_error(
+            unpaired_players,
+            pairing_history,
+            round_number,
         )
 
     # Add bye match if we have a bye player
@@ -248,6 +266,62 @@ def pair_round(
         new_matches.append(bye_match)
 
     return new_matches
+
+
+def _raise_impossible_pairing_error(
+    unpaired_players: list[StandingsEntry],
+    pairing_history: dict[UUID, set[UUID]],
+    round_number: int,
+) -> None:
+    """
+    Raise a detailed error when pairing is impossible.
+
+    Analyzes why pairing failed and provides actionable guidance.
+
+    Args:
+        unpaired_players: Players that couldn't be paired
+        pairing_history: Who has played whom
+        round_number: Current round number
+
+    Raises:
+        ValueError: With detailed explanation of why pairing failed
+    """
+    player_names = [f"Player {p.player.sequence_id}" for p in unpaired_players]
+
+    # Check if these players have all played each other
+    all_played_each_other = True
+    for i, player1 in enumerate(unpaired_players):
+        for player2 in unpaired_players[i + 1:]:
+            if player2.player.player_id not in pairing_history.get(
+                player1.player.player_id, set()
+            ):
+                all_played_each_other = False
+                break
+        if not all_played_each_other:
+            break
+
+    if all_played_each_other:
+        # Truly impossible - all remaining players have played each other
+        error_msg = (
+            f"IMPOSSIBLE PAIRING in Round {round_number}:\n"
+            f"  {len(unpaired_players)} unpaired players have all played each other already.\n"
+            f"  Players: {', '.join(player_names)}\n\n"
+            f"Tournament Organizer Actions:\n"
+            f"  1. Consider ending Swiss rounds here and cutting to Top 8\n"
+            f"  2. OR manually pair these players as rematches\n"
+            f"  3. OR reduce total Swiss rounds for future tournaments"
+        )
+    else:
+        # Algorithm error - pairing should have been possible
+        error_msg = (
+            f"PAIRING ALGORITHM ERROR in Round {round_number}:\n"
+            f"  Failed to pair {len(unpaired_players)} players.\n"
+            f"  Players: {', '.join(player_names)}\n\n"
+            f"This is a bug - pairing should have been possible.\n"
+            f"Please report this scenario to the developers."
+        )
+
+    raise ValueError(error_msg)
 
 
 def _select_bye_player(
