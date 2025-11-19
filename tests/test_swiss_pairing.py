@@ -422,12 +422,38 @@ class TestPlayerStateChanges:
             base_tournament_data["tournament_id"], players
         )
 
+        # Create round 1 matches
+        round1_pairings = pair_round_1(registrations, base_tournament_data["component"])
+
+        # Simulate round 1 results
+        for i, match in enumerate(round1_pairings):
+            match.player1_wins = 2 if i % 2 == 0 else 0
+            match.player2_wins = 0 if i % 2 == 0 else 2
+
         # Player 4 drops after round 1
         registrations[3].status = PlayerStatus.DROPPED
         registrations[3].drop_time = datetime.now(timezone.utc)
 
-        # TODO: Round 2 pairing should skip Player 4
-        pytest.skip("Pairing algorithm not yet implemented")
+        # Pair round 2 - should skip dropped player
+        config = {"standings_tiebreakers": ["omw", "gw", "ogw"]}
+        round2_pairings = pair_round(
+            registrations,
+            round1_pairings,
+            base_tournament_data["component"],
+            config,
+            round_number=2,
+        )
+
+        # Verify dropped player is NOT in any pairing
+        dropped_player_id = players[3].id
+        for match in round2_pairings:
+            assert match.player1_id != dropped_player_id, "Dropped player in player1"
+            assert match.player2_id != dropped_player_id, "Dropped player in player2"
+
+        # Should have 3 matches + 1 bye (7 active players)
+        assert len(round2_pairings) == 4
+        bye_matches = [m for m in round2_pairings if m.player2_id is None]
+        assert len(bye_matches) == 1
 
     def test_late_entry_receives_bye_losses(self, base_tournament_data):
         """
@@ -443,7 +469,48 @@ class TestPlayerStateChanges:
         SCENARIO: 8 players start, 1 drops, now 7 active
         EXPECTED: Round 2 should have 1 bye for the 7 remaining players
         """
-        pytest.skip("Pairing algorithm not yet implemented")
+        players = create_test_players(8)
+        registrations = create_registrations(
+            base_tournament_data["tournament_id"], players
+        )
+
+        # Create round 1 matches (8 players, 4 matches, no byes)
+        round1_pairings = pair_round_1(registrations, base_tournament_data["component"])
+        assert len(round1_pairings) == 4
+        assert all(m.player2_id is not None for m in round1_pairings)
+
+        # Simulate round 1 results
+        for match in round1_pairings:
+            match.player1_wins = 2
+            match.player2_wins = 0
+
+        # Player 1 drops after round 1
+        registrations[0].status = PlayerStatus.DROPPED
+        registrations[0].drop_time = datetime.now(timezone.utc)
+
+        # Pair round 2 with 7 active players
+        config = {"standings_tiebreakers": ["omw", "gw", "ogw"]}
+        round2_pairings = pair_round(
+            registrations,
+            round1_pairings,
+            base_tournament_data["component"],
+            config,
+            round_number=2,
+        )
+
+        # Verify: 7 players = 3 matches + 1 bye
+        assert len(round2_pairings) == 4
+        regular_matches = [m for m in round2_pairings if m.player2_id is not None]
+        bye_matches = [m for m in round2_pairings if m.player2_id is None]
+
+        assert len(regular_matches) == 3
+        assert len(bye_matches) == 1
+
+        # Verify dropped player not in any match
+        dropped_id = players[0].id
+        for match in round2_pairings:
+            assert match.player1_id != dropped_id
+            assert match.player2_id != dropped_id
 
 
 # =============================================================================
