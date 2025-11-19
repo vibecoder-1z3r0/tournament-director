@@ -213,27 +213,31 @@ Each entity has its own repository with full CRUD operations:
 - **Swiss standings calculator** (with configurable tiebreaker chains)
 - **Swiss pairing engine** (Round 1 + Round 2+ with no-rematch enforcement)
 - **Swiss tournament examples** (tiebreakers, standings, full 3-round pairing demo)
+- **Swiss edge case handling** (dropped players, late entries, bye rotation)
+- **Tournament lifecycle management** (round completion detection, round advancement)
+- **Comprehensive logging framework** (INFO/DEBUG levels, file rotation, structured logging)
+- **Full tournament integration tests** (8-player, 7-player with byes, drops & late entries)
+- **Impossible pairing detection** with Tournament Organizer guidance
+- **Minimum tournament size validation** (2+ players)
 
 ### 🔄 In Progress
 - FastAPI server with backend abstraction
 - REST endpoints for all CRUD operations
-- Swiss edge case handling (dropped players, late entries, bye rotation)
 
 ### 📋 Planned
 - Database backend (SQLAlchemy + PostgreSQL/SQLite)
 - Textual TUI implementation
 - Discord bot integration
-- Swiss tournament lifecycle integration (round advancement, state management)
 - Elimination bracket pairing (single/double elimination)
+- Tournament state machine (PENDING → IN_PROGRESS → COMPLETED)
 
 ### Next Steps
-1. Complete remaining Swiss edge cases (dropped players, late entries)
-2. Build tournament state machine and round advancement logic
-3. Complete FastAPI server implementation
-4. Add authentication and authorization
-5. Build TUI framework consuming API
-6. Add Discord bot integration
-7. Production deployment setup
+1. Complete FastAPI server implementation
+2. Add authentication and authorization
+3. Build TUI framework consuming API
+4. Implement tournament state machine
+5. Add Discord bot integration
+6. Production deployment setup
 
 ---
 
