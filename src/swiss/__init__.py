@@ -15,7 +15,7 @@ from .tiebreakers import (
     calculate_opponent_game_win_percentage,
 )
 from .standings import calculate_standings
-from .pairing import pair_round_1, pair_round
+from .pairing import pair_round_1, pair_round, generate_bye_losses_for_late_entry
 
 __all__ = [
     "StandingsEntry",
@@ -26,4 +26,5 @@ __all__ = [
     "calculate_standings",
     "pair_round_1",
     "pair_round",
+    "generate_bye_losses_for_late_entry",
 ]

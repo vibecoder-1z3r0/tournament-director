@@ -97,6 +97,52 @@ def pair_round_1(
     return matches
 
 
+def generate_bye_losses_for_late_entry(
+    registration: TournamentRegistration,
+    component: Component,
+    current_round: int,
+) -> list[Match]:
+    """
+    Generate bye losses for a player who joined late.
+
+    In Swiss tournaments, players who join after round 1 receive "bye losses"
+    for each round they missed. This ensures fair standings calculations.
+
+    Args:
+        registration: The late entry tournament registration
+        component: Tournament component
+        current_round: The current round number (rounds 1 to current_round-1 are missed)
+
+    Returns:
+        List of Match objects representing bye losses
+
+    Example:
+        Player joins before Round 3:
+        - Receives bye loss for Round 1
+        - Receives bye loss for Round 2
+        - Paired normally from Round 3 onwards
+    """
+    bye_losses = []
+
+    for round_num in range(1, current_round):
+        bye_loss = Match(
+            id=uuid4(),
+            tournament_id=component.tournament_id,
+            component_id=component.id,
+            round_id=uuid4(),  # Phantom round ID
+            round_number=round_num,
+            player1_id=registration.player_id,
+            player2_id=None,  # Bye opponent
+            player1_wins=0,  # Loss
+            player2_wins=2,  # Bye "wins"
+            draws=0,
+            table_number=None,
+        )
+        bye_losses.append(bye_loss)
+
+    return bye_losses
+
+
 def pair_round(
     registrations: list[TournamentRegistration],
     matches: list[Match],

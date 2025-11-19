@@ -462,7 +462,71 @@ class TestPlayerStateChanges:
           - Late entry player receives bye losses for missed rounds
           - Late entry player is paired normally in future rounds
         """
-        pytest.skip("Pairing algorithm not yet implemented")
+        # Start with 6 players
+        players = create_test_players(6)
+        registrations = create_registrations(
+            base_tournament_data["tournament_id"], players
+        )
+
+        # Run round 1
+        round1_pairings = pair_round_1(registrations, base_tournament_data["component"])
+        for match in round1_pairings:
+            match.player1_wins = 2
+            match.player2_wins = 0
+
+        # Player 7 joins late (after round 1)
+        late_player = Player(
+            id=uuid4(),
+            name="Late Entry Player",
+            created_at=datetime.now(timezone.utc),
+        )
+        late_registration = TournamentRegistration(
+            id=uuid4(),
+            tournament_id=base_tournament_data["tournament_id"],
+            player_id=late_player.id,
+            sequence_id=7,
+            status=PlayerStatus.ACTIVE,
+            registration_time=datetime.now(timezone.utc),
+        )
+        registrations.append(late_registration)
+
+        # Generate bye loss for late entry
+        from src.swiss.pairing import generate_bye_losses_for_late_entry
+        bye_losses = generate_bye_losses_for_late_entry(
+            late_registration,
+            base_tournament_data["component"],
+            current_round=2,
+        )
+
+        # Should have 1 bye loss for round 1
+        assert len(bye_losses) == 1
+        assert bye_losses[0].round_number == 1
+        assert bye_losses[0].player1_id == late_player.id
+        assert bye_losses[0].player2_id is None
+        assert bye_losses[0].player1_wins == 0  # Loss
+        assert bye_losses[0].player2_wins == 2  # Bye opponent "wins"
+
+        # Add bye losses to match history
+        all_matches = round1_pairings + bye_losses
+
+        # Pair round 2 - late entry should be included
+        config = {"standings_tiebreakers": ["omw", "gw", "ogw"]}
+        round2_pairings = pair_round(
+            registrations,
+            all_matches,
+            base_tournament_data["component"],
+            config,
+            round_number=2,
+        )
+
+        # Late entry should be in a pairing
+        late_entry_paired = False
+        for match in round2_pairings:
+            if match.player1_id == late_player.id or match.player2_id == late_player.id:
+                late_entry_paired = True
+                break
+
+        assert late_entry_paired, "Late entry should be paired in round 2"
 
     def test_odd_players_after_drop(self, base_tournament_data):
         """
