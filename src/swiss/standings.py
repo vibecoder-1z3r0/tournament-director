@@ -7,6 +7,7 @@ sorted by match points and configurable tiebreaker chains.
 AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0
 """
 
+import logging
 from uuid import UUID
 
 from src.models.tournament import TournamentRegistration
@@ -23,6 +24,8 @@ from .tiebreakers import (
     get_opponent_id,
     is_bye_match,
 )
+
+logger = logging.getLogger(__name__)
 
 
 # Tiebreaker calculator registry
@@ -53,6 +56,11 @@ def calculate_standings(
     Returns:
         List of StandingsEntry objects sorted by rank (best to worst)
     """
+    logger.info(
+        f"Calculating standings: {len(players)} players, {len(matches)} matches, "
+        f"tiebreakers={config.get('standings_tiebreakers', [])}"
+    )
+
     standings = []
 
     for player in players:
@@ -152,5 +160,13 @@ def calculate_standings(
     # Assign ranks
     for rank, entry in enumerate(standings, start=1):
         entry.rank = rank
+
+    if standings:
+        logger.info(
+            f"Standings calculated: {len(standings)} players, "
+            f"leader=seq#{standings[0].player.sequence_id} ({standings[0].match_points}pts)"
+        )
+    else:
+        logger.warning("Standings calculation resulted in empty standings list")
 
     return standings

@@ -8,6 +8,7 @@ AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0
 """
 
 import random
+import logging
 from uuid import UUID, uuid4
 from collections import defaultdict
 
@@ -15,6 +16,8 @@ from src.models.tournament import TournamentRegistration
 from src.models.match import Match, Component
 from src.swiss.standings import calculate_standings
 from src.swiss.models import StandingsEntry
+
+logger = logging.getLogger(__name__)
 
 
 def pair_round_1(
@@ -36,7 +39,13 @@ def pair_round_1(
     Raises:
         ValueError: If registrations list is empty or too small
     """
+    logger.info(
+        f"Starting Round 1 pairing: tournament={component.tournament_id}, "
+        f"mode={mode}, total_registrations={len(registrations)}"
+    )
+
     if not registrations:
+        logger.error("Cannot pair empty player list")
         raise ValueError("Cannot pair empty player list")
 
     # Filter to only active players
@@ -46,10 +55,16 @@ def pair_round_1(
     ]
 
     if not active_players:
+        logger.error("No active players to pair")
         raise ValueError("No active players to pair")
+
+    logger.info(f"Round 1: {len(active_players)} active players after filtering")
 
     # Minimum tournament size: 2 players
     if len(active_players) < 2:
+        logger.error(
+            f"Insufficient players: {len(active_players)} active, minimum 2 required"
+        )
         raise ValueError(
             f"Swiss tournament requires at least 2 players. "
             f"Currently have {len(active_players)} active player(s)."
@@ -57,12 +72,15 @@ def pair_round_1(
 
     # Sort/shuffle based on mode
     if mode == "random":
+        logger.debug("Using random shuffle for Round 1 pairing")
         players = list(active_players)
         random.shuffle(players)
     elif mode == "seeded":
+        logger.debug("Using seeded pairing (by sequence_id) for Round 1")
         # Pair by sequence_id: #1 vs #2, #3 vs #4, etc.
         players = sorted(active_players, key=lambda p: p.sequence_id)
     else:
+        logger.error(f"Invalid pairing mode: {mode}")
         raise ValueError(f"Invalid pairing mode: {mode}")
 
     # Create matches
@@ -82,10 +100,18 @@ def pair_round_1(
             table_number=len(matches) + 1,
         )
         matches.append(match)
+        logger.debug(
+            f"Created pairing: player1=seq#{players[i].sequence_id} vs "
+            f"player2=seq#{players[i + 1].sequence_id}, table={len(matches)}"
+        )
 
     # Handle bye for odd player count
     if len(players) % 2 == 1:
         bye_player = players[-1]  # Last player gets bye
+        logger.info(
+            f"Round 1: Odd player count, assigning bye to "
+            f"player=seq#{bye_player.sequence_id}"
+        )
         bye_match = Match(
             id=uuid4(),
             tournament_id=component.tournament_id,
@@ -100,6 +126,12 @@ def pair_round_1(
             table_number=None,  # Byes don't get table numbers
         )
         matches.append(bye_match)
+
+    logger.info(
+        f"Round 1 pairing complete: {len(matches)} matches created "
+        f"({len([m for m in matches if m.player2_id is not None])} regular, "
+        f"{len([m for m in matches if m.player2_id is None])} bye)"
+    )
 
     return matches
 
@@ -129,6 +161,12 @@ def generate_bye_losses_for_late_entry(
         - Receives bye loss for Round 2
         - Paired normally from Round 3 onwards
     """
+    missed_rounds = current_round - 1
+    logger.info(
+        f"Generating bye losses for late entry: player=seq#{registration.sequence_id}, "
+        f"current_round={current_round}, missed_rounds={missed_rounds}"
+    )
+
     bye_losses = []
 
     for round_num in range(1, current_round):
@@ -146,6 +184,12 @@ def generate_bye_losses_for_late_entry(
             table_number=None,
         )
         bye_losses.append(bye_loss)
+        logger.debug(
+            f"Created bye loss: player=seq#{registration.sequence_id}, "
+            f"round={round_num}, result=0-2"
+        )
+
+    logger.info(f"Late entry bye losses created: {len(bye_losses)} losses")
 
     return bye_losses
 
@@ -180,17 +224,33 @@ def pair_round(
     Raises:
         ValueError: If pairing is impossible (all players have played each other)
     """
+    logger.info(
+        f"Starting Round {round_number} pairing: tournament={component.tournament_id}, "
+        f"total_registrations={len(registrations)}, previous_matches={len(matches)}"
+    )
+
     # Filter to only active players
     active_players = [
         reg for reg in registrations
         if reg.status.value == "active"
     ]
 
+    dropped_count = len(registrations) - len(active_players)
+    if dropped_count > 0:
+        logger.info(f"Round {round_number}: {dropped_count} dropped player(s) excluded")
+
     if not active_players:
+        logger.error("No active players to pair")
         raise ValueError("No active players to pair")
+
+    logger.info(f"Round {round_number}: {len(active_players)} active players")
 
     # Minimum tournament size: 2 players
     if len(active_players) < 2:
+        logger.error(
+            f"Insufficient players for Round {round_number}: "
+            f"{len(active_players)} active, minimum 2 required"
+        )
         raise ValueError(
             f"Swiss tournament requires at least 2 players. "
             f"Currently have {len(active_players)} active player(s). "
@@ -198,23 +258,42 @@ def pair_round(
         )
 
     # Calculate current standings
+    logger.debug(f"Round {round_number}: Calculating standings")
     standings = calculate_standings(active_players, matches, config)
+    logger.debug(
+        f"Round {round_number}: Standings calculated, "
+        f"top_player_points={standings[0].match_points if standings else 0}"
+    )
 
     # Build pairing history (who has played whom)
     pairing_history = _build_pairing_history(matches)
+    total_previous_pairings = sum(len(opponents) for opponents in pairing_history.values()) // 2
+    logger.debug(
+        f"Round {round_number}: Pairing history built, "
+        f"total_previous_pairings={total_previous_pairings}"
+    )
 
     # Check for odd player count and assign bye BEFORE pairing
     bye_player = None
     pairings_standings = standings
 
     if len(standings) % 2 == 1:
+        logger.info(f"Round {round_number}: Odd player count, selecting bye recipient")
         # Find lowest-ranked player who hasn't had a bye yet
         bye_player = _select_bye_player(standings, matches)
+        logger.info(
+            f"Round {round_number}: Bye assigned to player=seq#{bye_player.player.sequence_id}, "
+            f"rank={bye_player.rank}, points={bye_player.match_points}"
+        )
         # Remove bye player from pairing pool
         pairings_standings = [s for s in standings if s.player.player_id != bye_player.player.player_id]
 
     # Group players into brackets by match points
     brackets = _group_into_brackets(pairings_standings)
+    logger.debug(
+        f"Round {round_number}: Players grouped into {len(brackets)} bracket(s): "
+        f"{dict((points, len(players)) for points, players in brackets.items())}"
+    )
 
     # Pair players within brackets
     new_matches = []
@@ -225,6 +304,11 @@ def pair_round(
         # Add any pair-downs from higher brackets
         bracket_players = list(bracket_entries) + unpaired_players
         unpaired_players = []
+
+        logger.debug(
+            f"Round {round_number}: Pairing bracket with {match_points} points, "
+            f"{len(bracket_players)} players (including {len(unpaired_players)} pair-downs)"
+        )
 
         # Try to pair players in this bracket
         paired, unpaired = _pair_bracket(
@@ -239,8 +323,18 @@ def pair_round(
         new_matches.extend(paired)
         unpaired_players = unpaired
 
+        if len(paired) > 0:
+            logger.debug(
+                f"Round {round_number}: Bracket {match_points}pts: "
+                f"{len(paired)} matches created, {len(unpaired)} unpaired"
+            )
+
     # Handle any remaining unpaired players
     if len(unpaired_players) > 0:
+        logger.warning(
+            f"Round {round_number}: {len(unpaired_players)} unpaired players after all brackets, "
+            f"checking if pairing is impossible"
+        )
         # This means we couldn't pair some players - check if it's truly impossible
         _raise_impossible_pairing_error(
             unpaired_players,
@@ -264,6 +358,13 @@ def pair_round(
             table_number=None,
         )
         new_matches.append(bye_match)
+        logger.debug(f"Round {round_number}: Bye match added for player=seq#{bye_player.player.sequence_id}")
+
+    logger.info(
+        f"Round {round_number} pairing complete: {len(new_matches)} matches created "
+        f"({len([m for m in new_matches if m.player2_id is not None])} regular, "
+        f"{len([m for m in new_matches if m.player2_id is None])} bye)"
+    )
 
     return new_matches
 
@@ -302,6 +403,10 @@ def _raise_impossible_pairing_error(
 
     if all_played_each_other:
         # Truly impossible - all remaining players have played each other
+        logger.error(
+            f"IMPOSSIBLE PAIRING detected in Round {round_number}: "
+            f"{len(unpaired_players)} unpaired players have all played each other"
+        )
         error_msg = (
             f"IMPOSSIBLE PAIRING in Round {round_number}:\n"
             f"  {len(unpaired_players)} unpaired players have all played each other already.\n"
@@ -313,6 +418,10 @@ def _raise_impossible_pairing_error(
         )
     else:
         # Algorithm error - pairing should have been possible
+        logger.critical(
+            f"PAIRING ALGORITHM ERROR in Round {round_number}: "
+            f"Failed to pair {len(unpaired_players)} players despite valid pairings existing"
+        )
         error_msg = (
             f"PAIRING ALGORITHM ERROR in Round {round_number}:\n"
             f"  Failed to pair {len(unpaired_players)} players.\n"
@@ -351,6 +460,8 @@ def _select_bye_player(
     # Find minimum bye count
     min_byes = min((bye_counts.get(s.player.player_id, 0) for s in standings), default=0)
 
+    logger.debug(f"Bye selection: min_byes={min_byes}, total_players={len(standings)}")
+
     # Get players with minimum byes (reverse order = lowest ranked first)
     candidates = [
         s for s in reversed(standings)
@@ -358,7 +469,13 @@ def _select_bye_player(
     ]
 
     # Return lowest-ranked candidate
-    return candidates[0]
+    selected = candidates[0]
+    logger.debug(
+        f"Bye selection: Selected player=seq#{selected.player.sequence_id}, "
+        f"rank={selected.rank}, previous_byes={min_byes}"
+    )
+
+    return selected
 
 
 def _build_pairing_history(matches: list[Match]) -> dict[UUID, set[UUID]]:

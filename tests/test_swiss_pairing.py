@@ -906,11 +906,19 @@ class TestFullTournamentPairing:
         assert len(bye_matches_r1) == 1, "Should have exactly 1 bye"
         bye_recipients.append(bye_matches_r1[0].player1_id)
 
-        # Simulate results
+        # Simulate varied results to spread players across brackets
         for i, match in enumerate(round1):
             if match.player2_id is not None:
-                match.player1_wins = 2 if i % 2 == 0 else 0
-                match.player2_wins = 0 if i % 2 == 0 else 2
+                # Create more diverse outcomes
+                if i == 0:
+                    match.player1_wins = 2
+                    match.player2_wins = 0
+                elif i == 1:
+                    match.player1_wins = 0
+                    match.player2_wins = 2
+                else:
+                    match.player1_wins = 2
+                    match.player2_wins = 1  # Close match
         all_matches.extend(round1)
 
         # ROUND 2
@@ -934,11 +942,21 @@ class TestFullTournamentPairing:
         }
         assert len(round1_pairs & round2_pairs) == 0, "Found rematches in round 2"
 
-        # Simulate results
-        for i, match in enumerate(round2):
+        # Simulate varied results for round 2
+        match_idx = 0
+        for match in round2:
             if match.player2_id is not None:
-                match.player1_wins = 2 if i < 2 else 0
-                match.player2_wins = 0 if i < 2 else 2
+                # Create diverse outcomes
+                if match_idx == 0:
+                    match.player1_wins = 2
+                    match.player2_wins = 1
+                elif match_idx == 1:
+                    match.player1_wins = 1
+                    match.player2_wins = 2
+                else:
+                    match.player1_wins = 0
+                    match.player2_wins = 2
+                match_idx += 1
         all_matches.extend(round2)
 
         # ROUND 3
