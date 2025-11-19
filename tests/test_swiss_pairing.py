@@ -822,7 +822,65 @@ class TestFullTournamentPairing:
           - Round 3: Standings-based pairing, no rematches
           - Final standings calculated correctly
         """
-        pytest.skip("Full pairing workflow not yet implemented")
+        # AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0 - Integration test
+        players = create_test_players(8)
+        registrations = create_registrations(
+            base_tournament_data["tournament_id"], players
+        )
+        config = {"standings_tiebreakers": ["omw", "gw", "ogw"]}
+        all_matches = []
+
+        # ROUND 1
+        round1 = pair_round_1(registrations, base_tournament_data["component"])
+        assert len(round1) == 4
+        assert all(m.player2_id is not None for m in round1)  # No byes with 8 players
+
+        # Simulate varied results
+        for i, match in enumerate(round1):
+            match.player1_wins = 2 if i % 2 == 0 else 0
+            match.player2_wins = 0 if i % 2 == 0 else 2
+        all_matches.extend(round1)
+
+        # ROUND 2
+        round2 = pair_round(
+            registrations, all_matches, base_tournament_data["component"],
+            config, round_number=2
+        )
+        assert len(round2) == 4
+
+        # Check no rematches
+        round1_pairs = {frozenset([m.player1_id, m.player2_id]) for m in round1}
+        round2_pairs = {frozenset([m.player1_id, m.player2_id]) for m in round2}
+        assert len(round1_pairs & round2_pairs) == 0, "Found rematches in round 2"
+
+        # Simulate varied results
+        for i, match in enumerate(round2):
+            match.player1_wins = 2 if i < 2 else 1
+            match.player2_wins = 0 if i < 2 else 2
+        all_matches.extend(round2)
+
+        # ROUND 3
+        round3 = pair_round(
+            registrations, all_matches, base_tournament_data["component"],
+            config, round_number=3
+        )
+        assert len(round3) == 4
+
+        # Check no rematches from any previous round
+        round3_pairs = {frozenset([m.player1_id, m.player2_id]) for m in round3}
+        all_prev_pairs = round1_pairs | round2_pairs
+        assert len(all_prev_pairs & round3_pairs) == 0, "Found rematches in round 3"
+
+        # Final standings
+        for match in round3:
+            match.player1_wins = 2
+            match.player2_wins = 0
+        all_matches.extend(round3)
+
+        final_standings = calculate_standings(registrations, all_matches, config)
+        assert len(final_standings) == 8
+        assert final_standings[0].rank == 1
+        assert all(s.matches_played == 3 for s in final_standings)
 
     def test_complete_7player_4round_tournament(self, base_tournament_data):
         """
@@ -832,7 +890,120 @@ class TestFullTournamentPairing:
           - Bye rotates (no player gets 2 byes if avoidable)
           - All non-bye pairings valid (no rematches, standings-based)
         """
-        pytest.skip("Full pairing workflow not yet implemented")
+        # AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0 - Integration test with byes
+        players = create_test_players(7)
+        registrations = create_registrations(
+            base_tournament_data["tournament_id"], players
+        )
+        config = {"standings_tiebreakers": ["omw", "gw", "ogw"]}
+        all_matches = []
+        bye_recipients = []  # Track who gets byes
+
+        # ROUND 1
+        round1 = pair_round_1(registrations, base_tournament_data["component"])
+        assert len(round1) == 4  # 3 matches + 1 bye
+        bye_matches_r1 = [m for m in round1 if m.player2_id is None]
+        assert len(bye_matches_r1) == 1, "Should have exactly 1 bye"
+        bye_recipients.append(bye_matches_r1[0].player1_id)
+
+        # Simulate results
+        for i, match in enumerate(round1):
+            if match.player2_id is not None:
+                match.player1_wins = 2 if i % 2 == 0 else 0
+                match.player2_wins = 0 if i % 2 == 0 else 2
+        all_matches.extend(round1)
+
+        # ROUND 2
+        round2 = pair_round(
+            registrations, all_matches, base_tournament_data["component"],
+            config, round_number=2
+        )
+        assert len(round2) == 4
+        bye_matches_r2 = [m for m in round2 if m.player2_id is None]
+        assert len(bye_matches_r2) == 1, "Should have exactly 1 bye"
+        bye_recipients.append(bye_matches_r2[0].player1_id)
+
+        # Check no rematches (excluding bye matches)
+        round1_pairs = {
+            frozenset([m.player1_id, m.player2_id])
+            for m in round1 if m.player2_id is not None
+        }
+        round2_pairs = {
+            frozenset([m.player1_id, m.player2_id])
+            for m in round2 if m.player2_id is not None
+        }
+        assert len(round1_pairs & round2_pairs) == 0, "Found rematches in round 2"
+
+        # Simulate results
+        for i, match in enumerate(round2):
+            if match.player2_id is not None:
+                match.player1_wins = 2 if i < 2 else 0
+                match.player2_wins = 0 if i < 2 else 2
+        all_matches.extend(round2)
+
+        # ROUND 3
+        round3 = pair_round(
+            registrations, all_matches, base_tournament_data["component"],
+            config, round_number=3
+        )
+        assert len(round3) == 4
+        bye_matches_r3 = [m for m in round3 if m.player2_id is None]
+        assert len(bye_matches_r3) == 1
+        bye_recipients.append(bye_matches_r3[0].player1_id)
+
+        # Check no rematches
+        round3_pairs = {
+            frozenset([m.player1_id, m.player2_id])
+            for m in round3 if m.player2_id is not None
+        }
+        all_prev_pairs = round1_pairs | round2_pairs
+        assert len(all_prev_pairs & round3_pairs) == 0, "Found rematches in round 3"
+
+        # Simulate results
+        for i, match in enumerate(round3):
+            if match.player2_id is not None:
+                match.player1_wins = 2 if i % 2 == 0 else 1
+                match.player2_wins = 0 if i % 2 == 0 else 2
+        all_matches.extend(round3)
+
+        # ROUND 4
+        round4 = pair_round(
+            registrations, all_matches, base_tournament_data["component"],
+            config, round_number=4
+        )
+        assert len(round4) == 4
+        bye_matches_r4 = [m for m in round4 if m.player2_id is None]
+        assert len(bye_matches_r4) == 1
+        bye_recipients.append(bye_matches_r4[0].player1_id)
+
+        # Check no rematches
+        round4_pairs = {
+            frozenset([m.player1_id, m.player2_id])
+            for m in round4 if m.player2_id is not None
+        }
+        all_prev_pairs = round1_pairs | round2_pairs | round3_pairs
+        assert len(all_prev_pairs & round4_pairs) == 0, "Found rematches in round 4"
+
+        # Simulate results
+        for match in round4:
+            if match.player2_id is not None:
+                match.player1_wins = 2
+                match.player2_wins = 0
+        all_matches.extend(round4)
+
+        # Verify bye rotation - check that byes are distributed fairly
+        # In 4 rounds with 7 players, at least 3 different players should get byes
+        unique_bye_recipients = set(bye_recipients)
+        assert len(unique_bye_recipients) >= 3, (
+            f"Byes not distributed well: {len(unique_bye_recipients)} unique recipients "
+            f"out of 7 players in 4 rounds"
+        )
+
+        # Final standings
+        final_standings = calculate_standings(registrations, all_matches, config)
+        assert len(final_standings) == 7
+        assert final_standings[0].rank == 1
+        assert all(s.matches_played == 4 for s in final_standings)
 
     def test_tournament_with_drops_and_late_entries(self, base_tournament_data):
         """
@@ -843,4 +1014,150 @@ class TestFullTournamentPairing:
           - Round 3: 8 players (4 matches) - Late entry added with bye losses
           - All pairings valid and standings correct
         """
-        pytest.skip("Full pairing workflow not yet implemented")
+        # AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0 - Integration test with drops and late entries
+        from src.swiss.pairing import generate_bye_losses_for_late_entry
+
+        players = create_test_players(8)
+        registrations = create_registrations(
+            base_tournament_data["tournament_id"], players
+        )
+        config = {"standings_tiebreakers": ["omw", "gw", "ogw"]}
+        all_matches = []
+
+        # ROUND 1 - 8 players
+        round1 = pair_round_1(registrations, base_tournament_data["component"])
+        assert len(round1) == 4  # 4 matches, no byes
+        assert all(m.player2_id is not None for m in round1), "Should have no byes"
+
+        # Simulate varied results to create different brackets
+        for i, match in enumerate(round1):
+            # Create varied outcomes: wins, losses, and some draws
+            if i == 0:
+                match.player1_wins = 2
+                match.player2_wins = 0
+            elif i == 1:
+                match.player1_wins = 0
+                match.player2_wins = 2
+            elif i == 2:
+                match.player1_wins = 2
+                match.player2_wins = 1  # Close match
+            else:
+                match.player1_wins = 1
+                match.player2_wins = 2  # Close match
+        all_matches.extend(round1)
+
+        # Player 1 drops after round 1
+        dropped_player_id = players[0].id
+        registrations[0].status = PlayerStatus.DROPPED
+        registrations[0].drop_time = datetime.now(timezone.utc)
+
+        # ROUND 2 - 7 players (1 dropped)
+        round2 = pair_round(
+            registrations, all_matches, base_tournament_data["component"],
+            config, round_number=2
+        )
+        assert len(round2) == 4  # 3 matches + 1 bye
+        bye_matches_r2 = [m for m in round2 if m.player2_id is None]
+        assert len(bye_matches_r2) == 1, "Should have 1 bye with 7 active players"
+
+        # Verify dropped player not in any pairing
+        for match in round2:
+            assert match.player1_id != dropped_player_id
+            assert match.player2_id != dropped_player_id
+
+        # Simulate varied results for round 2
+        match_idx = 0
+        for match in round2:
+            if match.player2_id is not None:
+                # Create diverse outcomes to spread players across brackets
+                if match_idx == 0:
+                    match.player1_wins = 2
+                    match.player2_wins = 1
+                elif match_idx == 1:
+                    match.player1_wins = 1
+                    match.player2_wins = 2
+                else:
+                    match.player1_wins = 0
+                    match.player2_wins = 2
+                match_idx += 1
+        all_matches.extend(round2)
+
+        # Late entry joins before round 3
+        late_player = Player(
+            id=uuid4(),
+            name="Late Entry Player",
+            created_at=datetime.now(timezone.utc),
+        )
+        late_registration = TournamentRegistration(
+            id=uuid4(),
+            tournament_id=base_tournament_data["tournament_id"],
+            player_id=late_player.id,
+            sequence_id=9,  # Next available sequence
+            status=PlayerStatus.ACTIVE,
+            registration_time=datetime.now(timezone.utc),
+        )
+        registrations.append(late_registration)
+
+        # Generate bye losses for rounds 1 and 2
+        bye_losses = generate_bye_losses_for_late_entry(
+            late_registration,
+            base_tournament_data["component"],
+            current_round=3,  # Joining before round 3
+        )
+        assert len(bye_losses) == 2, "Should have bye losses for rounds 1 and 2"
+        all_matches.extend(bye_losses)
+
+        # ROUND 3 - 8 active players (7 original + 1 late entry - 1 dropped)
+        round3 = pair_round(
+            registrations, all_matches, base_tournament_data["component"],
+            config, round_number=3
+        )
+        assert len(round3) == 4  # 4 matches, no byes
+
+        # Verify late entry is paired
+        late_entry_paired = False
+        for match in round3:
+            if match.player1_id == late_player.id or match.player2_id == late_player.id:
+                late_entry_paired = True
+                break
+        assert late_entry_paired, "Late entry should be paired in round 3"
+
+        # Verify dropped player not in any pairing
+        for match in round3:
+            assert match.player1_id != dropped_player_id
+            assert match.player2_id != dropped_player_id
+
+        # Simulate results
+        for match in round3:
+            match.player1_wins = 2
+            match.player2_wins = 0
+        all_matches.extend(round3)
+
+        # Final standings - includes ALL players (active + dropped) for record-keeping
+        final_standings = calculate_standings(registrations, all_matches, config)
+        assert len(final_standings) == 9  # 7 active + 1 late entry + 1 dropped
+
+        # Verify dropped player IS in standings (for record-keeping)
+        # but has only 1 match played (from round 1)
+        dropped_standing = next(
+            (s for s in final_standings if s.player.player_id == dropped_player_id),
+            None
+        )
+        assert dropped_standing is not None, "Dropped player should be in standings"
+        assert dropped_standing.matches_played == 1, "Dropped player only played round 1"
+        assert dropped_standing.player.status.value == "dropped"
+
+        # Verify late entry is in standings (but with worse record due to bye losses)
+        late_entry_standing = next(
+            (s for s in final_standings if s.player.player_id == late_player.id),
+            None
+        )
+        assert late_entry_standing is not None, "Late entry should be in standings"
+        assert late_entry_standing.matches_played == 3, "Late entry: 2 bye losses + 1 real match"
+        assert late_entry_standing.player.status.value == "active"
+
+        # Count active vs dropped players in standings
+        active_count = sum(1 for s in final_standings if s.player.status.value == "active")
+        dropped_count = sum(1 for s in final_standings if s.player.status.value == "dropped")
+        assert active_count == 8, "Should have 8 active players"
+        assert dropped_count == 1, "Should have 1 dropped player"
