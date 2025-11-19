@@ -188,8 +188,18 @@ def pair_round(
     # Build pairing history (who has played whom)
     pairing_history = _build_pairing_history(matches)
 
+    # Check for odd player count and assign bye BEFORE pairing
+    bye_player = None
+    pairings_standings = standings
+
+    if len(standings) % 2 == 1:
+        # Find lowest-ranked player who hasn't had a bye yet
+        bye_player = _select_bye_player(standings, matches)
+        # Remove bye player from pairing pool
+        pairings_standings = [s for s in standings if s.player.player_id != bye_player.player.player_id]
+
     # Group players into brackets by match points
-    brackets = _group_into_brackets(standings)
+    brackets = _group_into_brackets(pairings_standings)
 
     # Pair players within brackets
     new_matches = []
@@ -215,23 +225,13 @@ def pair_round(
         unpaired_players = unpaired
 
     # Handle any remaining unpaired players (shouldn't happen with proper algorithm)
-    if len(unpaired_players) > 1:
+    if len(unpaired_players) > 0:
         raise ValueError(
             f"Failed to pair {len(unpaired_players)} players - algorithm error"
         )
 
-    # Handle bye for odd player count
-    if len(unpaired_players) == 1:
-        bye_player = unpaired_players[0]
-
-        # Check if player already had a bye
-        previous_byes = sum(
-            1 for m in matches
-            if m.player1_id == bye_player.player.player_id and m.player2_id is None
-        )
-
-        # In proper Swiss, avoid giving same player multiple byes if possible
-        # But for now, just assign the bye
+    # Add bye match if we have a bye player
+    if bye_player is not None:
         bye_match = Match(
             id=uuid4(),
             tournament_id=component.tournament_id,
@@ -248,6 +248,43 @@ def pair_round(
         new_matches.append(bye_match)
 
     return new_matches
+
+
+def _select_bye_player(
+    standings: list[StandingsEntry],
+    matches: list[Match],
+) -> StandingsEntry:
+    """
+    Select the player to receive a bye.
+
+    Swiss pairing rules:
+    1. Prefer lowest-ranked player who hasn't had a bye yet
+    2. If all have had byes, give to lowest-ranked (minimizes advantage)
+
+    Args:
+        standings: Current standings (sorted by rank)
+        matches: All previous matches (to check bye history)
+
+    Returns:
+        StandingsEntry for the player who should receive the bye
+    """
+    # Count previous byes for each player
+    bye_counts = defaultdict(int)
+    for match in matches:
+        if match.player2_id is None:  # Bye match
+            bye_counts[match.player1_id] += 1
+
+    # Find minimum bye count
+    min_byes = min((bye_counts.get(s.player.player_id, 0) for s in standings), default=0)
+
+    # Get players with minimum byes (reverse order = lowest ranked first)
+    candidates = [
+        s for s in reversed(standings)
+        if bye_counts.get(s.player.player_id, 0) == min_byes
+    ]
+
+    # Return lowest-ranked candidate
+    return candidates[0]
 
 
 def _build_pairing_history(matches: list[Match]) -> dict[UUID, set[UUID]]:

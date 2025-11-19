@@ -26,7 +26,7 @@ from src.models.base import (
     ComponentStatus,
     RoundStatus,
 )
-from src.swiss import pair_round_1, pair_round
+from src.swiss import pair_round_1, pair_round, calculate_standings
 
 
 # =============================================================================
@@ -380,7 +380,54 @@ class TestByeHandling:
           - Lowest-ranked player (0 points) gets the bye
           - Bye counts as 2-0 match win
         """
-        pytest.skip("Pairing algorithm not yet implemented")
+        # Create 8 players
+        players = create_test_players(8)
+        registrations = create_registrations(
+            base_tournament_data["tournament_id"], players
+        )
+
+        # Pair round 1
+        round1_pairings = pair_round_1(registrations, base_tournament_data["component"])
+
+        # Set results to create clear brackets
+        # Winners: players 0, 2, 4, 6 (4 players at 3 points)
+        # Losers: players 1, 3, 5, 7 (4 players at 0 points)
+        for match in round1_pairings:
+            match.player1_wins = 2
+            match.player2_wins = 0
+
+        # Drop a WINNER to create odd count (7 active players)
+        # This ensures we have 3 winners and 4 losers
+        registrations[0].status = PlayerStatus.DROPPED
+
+        # Pair round 2 with 7 active players (3 winners, 4 losers)
+        config = {"standings_tiebreakers": ["omw", "gw", "ogw"]}
+        round2_pairings = pair_round(
+            registrations,
+            round1_pairings,
+            base_tournament_data["component"],
+            config,
+            round_number=2,
+        )
+
+        # Find the bye
+        bye_matches = [m for m in round2_pairings if m.player2_id is None]
+        assert len(bye_matches) == 1
+
+        # Calculate standings to determine who should get the bye
+        active_regs = [r for r in registrations if r.status == PlayerStatus.ACTIVE]
+        standings = calculate_standings(active_regs, round1_pairings, config)
+
+        # The bye should go to the lowest-ranked player (last in standings)
+        lowest_ranked = standings[-1]
+        bye_match = bye_matches[0]
+        assert bye_match.player1_id == lowest_ranked.player.player_id, \
+            f"Bye should go to lowest-ranked player (rank {lowest_ranked.rank})"
+        assert bye_match.player1_wins == 2
+        assert bye_match.player2_wins == 0
+
+        # Verify bye went to a 0-point player
+        assert lowest_ranked.match_points == 0, "Lowest-ranked should have 0 points"
 
     def test_bye_rotation_no_duplicates(self, base_tournament_data):
         """
@@ -389,7 +436,54 @@ class TestByeHandling:
           - Each player gets exactly 1 bye over 4 rounds
           - OR: If impossible, minimize duplicate byes
         """
-        pytest.skip("Pairing algorithm not yet implemented")
+        # Create 5 players
+        players = create_test_players(5)
+        registrations = create_registrations(
+            base_tournament_data["tournament_id"], players
+        )
+
+        all_matches = []
+        config = {"standings_tiebreakers": ["omw", "gw", "ogw"]}
+
+        # Track who gets byes
+        bye_recipients = []
+
+        # Round 1
+        round1_pairings = pair_round_1(registrations, base_tournament_data["component"])
+        for match in round1_pairings:
+            match.player1_wins = 2
+            match.player2_wins = 0
+            if match.player2_id is None:
+                bye_recipients.append(match.player1_id)
+        all_matches.extend(round1_pairings)
+
+        # Rounds 2-4
+        for round_num in range(2, 5):
+            round_pairings = pair_round(
+                registrations,
+                all_matches,
+                base_tournament_data["component"],
+                config,
+                round_number=round_num,
+            )
+            for match in round_pairings:
+                match.player1_wins = 2
+                match.player2_wins = 0
+                if match.player2_id is None:
+                    bye_recipients.append(match.player1_id)
+            all_matches.extend(round_pairings)
+
+        # Verify: Each player should get at most 1 bye (ideally exactly 1)
+        player_ids = [p.id for p in players]
+        bye_counts = {pid: bye_recipients.count(pid) for pid in player_ids}
+
+        # All players should have received exactly 1 bye (5 players, 4 rounds, 1 bye per round)
+        for player_id, bye_count in bye_counts.items():
+            assert bye_count <= 1, f"Player {player_id} got {bye_count} byes, should be <= 1"
+
+        # At least 4 players should have gotten a bye (one per round)
+        players_with_byes = sum(1 for count in bye_counts.values() if count > 0)
+        assert players_with_byes >= 4, f"Only {players_with_byes}/5 players got byes"
 
     def test_bye_match_structure(self, base_tournament_data):
         """
@@ -401,7 +495,28 @@ class TestByeHandling:
           - Match.player2_wins = 0
           - Match.draws = 0
         """
-        pytest.skip("Pairing algorithm not yet implemented")
+        # Create 7 players (odd count)
+        players = create_test_players(7)
+        registrations = create_registrations(
+            base_tournament_data["tournament_id"], players
+        )
+
+        # Pair round 1
+        round1_pairings = pair_round_1(registrations, base_tournament_data["component"])
+
+        # Find the bye match
+        bye_matches = [m for m in round1_pairings if m.player2_id is None]
+        assert len(bye_matches) == 1, "Should have exactly one bye"
+
+        bye_match = bye_matches[0]
+
+        # Verify bye match structure
+        assert bye_match.player1_id is not None, "player1_id must be set"
+        assert bye_match.player2_id is None, "player2_id must be None for bye"
+        assert bye_match.player1_wins == 2, "Bye should count as 2-0 win"
+        assert bye_match.player2_wins == 0, "player2_wins should be 0"
+        assert bye_match.draws == 0, "Draws should be 0"
+        assert bye_match.table_number is None, "Byes don't get table numbers"
 
 
 # =============================================================================
