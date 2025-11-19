@@ -14,6 +14,7 @@ from .tiebreakers import (
     calculate_opponent_match_win_percentage,
     calculate_opponent_game_win_percentage,
 )
+from .standings import calculate_standings
 
 __all__ = [
     "StandingsEntry",
@@ -21,4 +22,5 @@ __all__ = [
     "calculate_game_win_percentage",
     "calculate_opponent_match_win_percentage",
     "calculate_opponent_game_win_percentage",
+    "calculate_standings",
 ]
