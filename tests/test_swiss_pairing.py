@@ -26,6 +26,7 @@ from src.models.base import (
     ComponentStatus,
     RoundStatus,
 )
+from src.swiss import pair_round_1, pair_round
 
 
 # =============================================================================
@@ -145,20 +146,18 @@ class TestRound1Pairing:
             base_tournament_data["tournament_id"], players
         )
 
-        # TODO: Implement pair_round_1() function
-        # pairings = pair_round_1(registrations, base_tournament_data["component"])
+        # AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0 - Test implementation
+        pairings = pair_round_1(registrations, base_tournament_data["component"])
 
-        # Assertions (when implemented):
-        # assert len(pairings) == 4
-        # assert all(p.player1_id != p.player2_id for p in pairings)
-        # assert all(p.player2_id is not None for p in pairings)  # No byes
+        # Basic assertions
+        assert len(pairings) == 4
+        assert all(p.player1_id != p.player2_id for p in pairings)
+        assert all(p.player2_id is not None for p in pairings)  # No byes
 
         # Verify all players paired exactly once
-        # player_ids = [p.player1_id for p in pairings] + [p.player2_id for p in pairings]
-        # assert len(player_ids) == 8
-        # assert len(set(player_ids)) == 8
-
-        pytest.skip("Pairing algorithm not yet implemented")
+        player_ids = [p.player1_id for p in pairings] + [p.player2_id for p in pairings]
+        assert len(player_ids) == 8
+        assert len(set(player_ids)) == 8
 
     def test_round1_odd_players_one_bye(self, base_tournament_data):
         """
@@ -170,13 +169,33 @@ class TestRound1Pairing:
             base_tournament_data["tournament_id"], players
         )
 
-        # TODO: Implement pair_round_1() function
-        pytest.skip("Pairing algorithm not yet implemented")
+        # AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0 - Test implementation
+        pairings = pair_round_1(registrations, base_tournament_data["component"])
 
         # Expected behavior:
         # - 3 regular matches (6 players)
         # - 1 bye match (player2_id = None)
-        # - Bye player should be determined by algorithm (random or lowest seed)
+        assert len(pairings) == 4  # 3 regular + 1 bye
+
+        # Find the bye match
+        bye_matches = [p for p in pairings if p.player2_id is None]
+        regular_matches = [p for p in pairings if p.player2_id is not None]
+
+        assert len(bye_matches) == 1
+        assert len(regular_matches) == 3
+
+        # Verify bye match structure
+        bye_match = bye_matches[0]
+        assert bye_match.player1_id is not None
+        assert bye_match.player2_id is None
+        assert bye_match.player1_wins == 2  # Bye counts as 2-0 win
+        assert bye_match.player2_wins == 0
+
+        # Verify all 7 players are accounted for
+        player_ids = [p.player1_id for p in pairings]
+        player_ids += [p.player2_id for p in regular_matches]  # Don't include None
+        assert len(player_ids) == 7
+        assert len(set(player_ids)) == 7
 
 
 # =============================================================================
@@ -264,21 +283,60 @@ class TestSubsequentRoundPairing:
             ),
         ]
 
-        # TODO: Implement pair_round() function
-        # round2_pairings = pair_round(
-        #     registrations,
-        #     previous_rounds=[round1],
-        #     previous_matches=round1_matches,
-        #     component=base_tournament_data["component"],
-        # )
-
-        pytest.skip("Pairing algorithm not yet implemented")
+        # AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0 - Test implementation
+        config = {"standings_tiebreakers": ["omw", "gw", "ogw"]}
+        round2_pairings = pair_round(
+            registrations,
+            round1_matches,
+            base_tournament_data["component"],
+            config,
+            round_number=2,
+        )
 
         # Expected assertions:
         # - 4 matches created
+        assert len(round2_pairings) == 4
+
+        # Verify no byes (even player count)
+        assert all(p.player2_id is not None for p in round2_pairings)
+
         # - Winners paired together (2 matches among 4 winners)
         # - Losers paired together (2 matches among 4 losers)
+        # Winners: players[0], players[2], players[4], players[6]
+        # Losers: players[1], players[3], players[5], players[7]
+        winners = {players[0].id, players[2].id, players[4].id, players[6].id}
+        losers = {players[1].id, players[3].id, players[5].id, players[7].id}
+
+        # Count matches within each bracket
+        winner_matches = 0
+        loser_matches = 0
+
+        for pairing in round2_pairings:
+            p1_winner = pairing.player1_id in winners
+            p2_winner = pairing.player2_id in winners
+
+            if p1_winner and p2_winner:
+                winner_matches += 1
+            elif not p1_winner and not p2_winner:
+                loser_matches += 1
+            else:
+                # Mixed bracket (shouldn't happen with proper Swiss)
+                # This would indicate a pair-down
+                pass
+
+        # We expect 2 winner-vs-winner and 2 loser-vs-loser matches
+        assert winner_matches == 2
+        assert loser_matches == 2
+
         # - No rematches from round 1
+        round1_pairings = set()
+        for match in round1_matches:
+            pair = frozenset([match.player1_id, match.player2_id])
+            round1_pairings.add(pair)
+
+        for match in round2_pairings:
+            pair = frozenset([match.player1_id, match.player2_id])
+            assert pair not in round1_pairings, "Found a rematch!"
 
     def test_round2_no_rematches(self, base_tournament_data):
         """
