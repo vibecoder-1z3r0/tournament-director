@@ -290,8 +290,9 @@ def pair_round(
 
     # Group players into brackets by match points
     brackets = _group_into_brackets(pairings_standings)
+    logger.info(f"Round {round_number}: Grouped players into {len(brackets)} bracket(s)")
     logger.debug(
-        f"Round {round_number}: Players grouped into {len(brackets)} bracket(s): "
+        f"Round {round_number}: Bracket breakdown: "
         f"{dict((points, len(players)) for points, players in brackets.items())}"
     )
 
@@ -302,12 +303,14 @@ def pair_round(
 
     for match_points, bracket_entries in sorted(brackets.items(), reverse=True):
         # Add any pair-downs from higher brackets
+        pair_down_count = len(unpaired_players)
         bracket_players = list(bracket_entries) + unpaired_players
         unpaired_players = []
 
         logger.debug(
-            f"Round {round_number}: Pairing bracket with {match_points} points, "
-            f"{len(bracket_players)} players (including {len(unpaired_players)} pair-downs)"
+            f"Round {round_number}: Pairing bracket {match_points}pts: "
+            f"{len(bracket_players)} players ({len(bracket_entries)} in bracket, "
+            f"{pair_down_count} pair-downs)"
         )
 
         # Try to pair players in this bracket
