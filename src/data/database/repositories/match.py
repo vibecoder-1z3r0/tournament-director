@@ -45,7 +45,7 @@ class DatabaseMatchRepository(MatchRepository):
         # Check for duplicate ID
         existing = await self.session.get(MatchModel, match.id)
         if existing:
-            raise DuplicateError(f"Match with ID {match.id} already exists")
+            raise DuplicateError("Match", "id", str(match.id))
 
         db_match = MatchModel(
             id=match.id,
@@ -73,7 +73,7 @@ class DatabaseMatchRepository(MatchRepository):
         """Get match by ID. Raises NotFoundError if not found."""
         db_match = await self.session.get(MatchModel, match_id)
         if not db_match:
-            raise NotFoundError(f"Match with ID {match_id} not found")
+            raise NotFoundError("Match", match_id)
 
         return self._to_pydantic(db_match)
 
@@ -137,7 +137,7 @@ class DatabaseMatchRepository(MatchRepository):
         """Update an existing match."""
         db_match = await self.session.get(MatchModel, match.id)
         if not db_match:
-            raise NotFoundError(f"Match with ID {match.id} not found")
+            raise NotFoundError("Match", match.id)
 
         db_match.table_number = match.table_number
         db_match.player1_wins = match.player1_wins
@@ -156,7 +156,7 @@ class DatabaseMatchRepository(MatchRepository):
         """Delete a match. Raises NotFoundError if not found."""
         db_match = await self.session.get(MatchModel, match_id)
         if not db_match:
-            raise NotFoundError(f"Match with ID {match_id} not found")
+            raise NotFoundError("Match", match_id)
 
         await self.session.delete(db_match)
         await self.session.flush()

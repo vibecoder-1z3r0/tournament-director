@@ -75,7 +75,7 @@ class DatabaseRegistrationRepository(RegistrationRepository):
         """Get registration by ID. Raises NotFoundError if not found."""
         db_reg = await self.session.get(TournamentRegistrationModel, registration_id)
         if not db_reg:
-            raise NotFoundError(f"Registration with ID {registration_id} not found")
+            raise NotFoundError("Registration", registration_id)
 
         return self._to_pydantic(db_reg)
 
@@ -155,7 +155,7 @@ class DatabaseRegistrationRepository(RegistrationRepository):
         """Update an existing registration."""
         db_reg = await self.session.get(TournamentRegistrationModel, registration.id)
         if not db_reg:
-            raise NotFoundError(f"Registration with ID {registration.id} not found")
+            raise NotFoundError("Registration", registration.id)
 
         db_reg.status = registration.status.value
         db_reg.drop_time = registration.drop_time
@@ -170,7 +170,7 @@ class DatabaseRegistrationRepository(RegistrationRepository):
         """Delete a registration. Raises NotFoundError if not found."""
         db_reg = await self.session.get(TournamentRegistrationModel, registration_id)
         if not db_reg:
-            raise NotFoundError(f"Registration with ID {registration_id} not found")
+            raise NotFoundError("Registration", registration_id)
 
         await self.session.delete(db_reg)
         await self.session.flush()

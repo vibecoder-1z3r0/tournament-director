@@ -9,6 +9,7 @@ AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -111,7 +112,7 @@ app.include_router(matches.router, tags=["Matches"])
 
 # Global exception handler
 @app.exception_handler(Exception)
-async def global_exception_handler(request, exc: Exception) -> JSONResponse:
+async def global_exception_handler(request: Any, exc: Exception) -> JSONResponse:
     """Handle uncaught exceptions gracefully."""
     return JSONResponse(
         status_code=500,
@@ -127,7 +128,7 @@ async def global_exception_handler(request, exc: Exception) -> JSONResponse:
 
 # Root endpoint
 @app.get("/", tags=["Root"])
-async def root():
+async def root() -> dict[str, Any]:
     """Root endpoint with API information."""
     return {
         "name": "Tournament Director API",

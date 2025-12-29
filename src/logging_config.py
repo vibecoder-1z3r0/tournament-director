@@ -11,6 +11,7 @@ import logging
 import logging.handlers
 import sys
 from pathlib import Path
+from typing import Any
 
 # Default log format with timestamp, level, module, and message
 DEFAULT_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -97,7 +98,8 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)
 
 
-def log_tournament_event(
+def log_tournament_event(  # type: ignore[no-untyped-def]  # TODO: Add type annotations
+
     logger: logging.Logger,
     event: str,
     tournament_id: str,
@@ -131,7 +133,7 @@ def log_pairing_decision(
     player1_id: str,
     player2_id: str | None,
     reason: str,
-    **context,
+    **context: Any,
 ) -> None:
     """
     Log a pairing decision with context.

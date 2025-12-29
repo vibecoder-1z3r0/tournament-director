@@ -46,7 +46,7 @@ class DatabaseTournamentRepository(TournamentRepository):
         # Check for duplicate ID
         existing = await self.session.get(TournamentModel, tournament.id)
         if existing:
-            raise DuplicateError(f"Tournament with ID {tournament.id} already exists")
+            raise DuplicateError("Tournament", "id", str(tournament.id))
 
         db_tournament = TournamentModel(
             id=tournament.id,
@@ -74,7 +74,7 @@ class DatabaseTournamentRepository(TournamentRepository):
         """Get tournament by ID. Raises NotFoundError if not found."""
         db_tournament = await self.session.get(TournamentModel, tournament_id)
         if not db_tournament:
-            raise NotFoundError(f"Tournament with ID {tournament_id} not found")
+            raise NotFoundError("Tournament", tournament_id)
 
         return self._to_pydantic(db_tournament)
 
@@ -125,7 +125,7 @@ class DatabaseTournamentRepository(TournamentRepository):
         """Update an existing tournament."""
         db_tournament = await self.session.get(TournamentModel, tournament.id)
         if not db_tournament:
-            raise NotFoundError(f"Tournament with ID {tournament.id} not found")
+            raise NotFoundError("Tournament", tournament.id)
 
         db_tournament.name = tournament.name
         db_tournament.status = tournament.status.value
@@ -149,7 +149,7 @@ class DatabaseTournamentRepository(TournamentRepository):
         """Delete a tournament. Raises NotFoundError if not found."""
         db_tournament = await self.session.get(TournamentModel, tournament_id)
         if not db_tournament:
-            raise NotFoundError(f"Tournament with ID {tournament_id} not found")
+            raise NotFoundError("Tournament", tournament_id)
 
         await self.session.delete(db_tournament)
         await self.session.flush()

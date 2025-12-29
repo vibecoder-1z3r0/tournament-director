@@ -40,7 +40,7 @@ class DatabaseComponentRepository(ComponentRepository):
         # Check for duplicate ID
         existing = await self.session.get(ComponentModel, component.id)
         if existing:
-            raise DuplicateError(f"Component with ID {component.id} already exists")
+            raise DuplicateError("Component", "id", str(component.id))
 
         db_component = ComponentModel(
             id=component.id,
@@ -62,7 +62,7 @@ class DatabaseComponentRepository(ComponentRepository):
         """Get component by ID. Raises NotFoundError if not found."""
         db_component = await self.session.get(ComponentModel, component_id)
         if not db_component:
-            raise NotFoundError(f"Component with ID {component_id} not found")
+            raise NotFoundError("Component", component_id)
 
         return self._to_pydantic(db_component)
 
@@ -99,7 +99,7 @@ class DatabaseComponentRepository(ComponentRepository):
         """Update an existing component."""
         db_component = await self.session.get(ComponentModel, component.id)
         if not db_component:
-            raise NotFoundError(f"Component with ID {component.id} not found")
+            raise NotFoundError("Component", component.id)
 
         db_component.type = component.type.value
         db_component.name = component.name
@@ -116,7 +116,7 @@ class DatabaseComponentRepository(ComponentRepository):
         """Delete a component. Raises NotFoundError if not found."""
         db_component = await self.session.get(ComponentModel, component_id)
         if not db_component:
-            raise NotFoundError(f"Component with ID {component_id} not found")
+            raise NotFoundError("Component", component_id)
 
         await self.session.delete(db_component)
         await self.session.flush()

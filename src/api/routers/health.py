@@ -68,7 +68,7 @@ async def detailed_health_check(data_layer: DataLayerDep) -> dict[str, Any]:
             "data_layer": data_layer_status,
         },
         "configuration": {
-            "backend": config.data_backend,
+            "backend": config.backend_type,
             "debug": config.debug,
         },
     }

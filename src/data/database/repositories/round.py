@@ -43,7 +43,7 @@ class DatabaseRoundRepository(RoundRepository):
         # Check for duplicate ID
         existing = await self.session.get(RoundModel, round_obj.id)
         if existing:
-            raise DuplicateError(f"Round with ID {round_obj.id} already exists")
+            raise DuplicateError("Round", "id", str(round_obj.id))
 
         db_round = RoundModel(
             id=round_obj.id,
@@ -68,7 +68,7 @@ class DatabaseRoundRepository(RoundRepository):
         """Get round by ID. Raises NotFoundError if not found."""
         db_round = await self.session.get(RoundModel, round_id)
         if not db_round:
-            raise NotFoundError(f"Round with ID {round_id} not found")
+            raise NotFoundError("Round", round_id)
 
         return self._to_pydantic(db_round)
 
@@ -117,7 +117,7 @@ class DatabaseRoundRepository(RoundRepository):
         """Update an existing round."""
         db_round = await self.session.get(RoundModel, round_obj.id)
         if not db_round:
-            raise NotFoundError(f"Round with ID {round_obj.id} not found")
+            raise NotFoundError("Round", round_obj.id)
 
         db_round.start_time = round_obj.start_time
         db_round.end_time = round_obj.end_time
@@ -136,7 +136,7 @@ class DatabaseRoundRepository(RoundRepository):
         """Delete a round. Raises NotFoundError if not found."""
         db_round = await self.session.get(RoundModel, round_id)
         if not db_round:
-            raise NotFoundError(f"Round with ID {round_id} not found")
+            raise NotFoundError("Round", round_id)
 
         await self.session.delete(db_round)
         await self.session.flush()

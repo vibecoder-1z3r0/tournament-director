@@ -9,7 +9,7 @@ AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0
 
 import logging
 from datetime import datetime, timezone
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from src.models.base import ComponentStatus, PlayerStatus, RoundStatus, TournamentStatus
 from src.models.match import Component, Match, Round
@@ -76,8 +76,8 @@ def is_round_complete(round_obj: Round, matches: list[Match]) -> bool:
 
 def advance_to_next_round(
     current_round: Round,
-    component_id,
-    tournament_id,
+    component_id: UUID,
+    tournament_id: UUID,
     max_rounds: int | None = None,
     tournament: Tournament | None = None,
     component: Component | None = None,
@@ -162,7 +162,6 @@ def advance_to_next_round(
         status=RoundStatus.ACTIVE,
         start_time=datetime.now(timezone.utc),
         end_time=None,
-        created_at=datetime.now(timezone.utc),
     )
 
     logger.info(

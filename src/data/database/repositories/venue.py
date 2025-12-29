@@ -26,7 +26,7 @@ class DatabaseVenueRepository(VenueRepository):
         # Check for duplicate ID
         existing = await self.session.get(VenueModel, venue.id)
         if existing:
-            raise DuplicateError(f"Venue with ID {venue.id} already exists")
+            raise DuplicateError("Venue", "id", str(venue.id))
 
         db_venue = VenueModel(
             id=venue.id,
@@ -44,7 +44,7 @@ class DatabaseVenueRepository(VenueRepository):
         """Get venue by ID. Raises NotFoundError if not found."""
         db_venue = await self.session.get(VenueModel, venue_id)
         if not db_venue:
-            raise NotFoundError(f"Venue with ID {venue_id} not found")
+            raise NotFoundError("Venue", venue_id)
 
         return Venue(
             id=db_venue.id,
@@ -92,7 +92,7 @@ class DatabaseVenueRepository(VenueRepository):
         """Update an existing venue."""
         db_venue = await self.session.get(VenueModel, venue.id)
         if not db_venue:
-            raise NotFoundError(f"Venue with ID {venue.id} not found")
+            raise NotFoundError("Venue", venue.id)
 
         db_venue.name = venue.name
         db_venue.address = venue.address
@@ -106,7 +106,7 @@ class DatabaseVenueRepository(VenueRepository):
         """Delete a venue. Raises NotFoundError if not found."""
         db_venue = await self.session.get(VenueModel, venue_id)
         if not db_venue:
-            raise NotFoundError(f"Venue with ID {venue_id} not found")
+            raise NotFoundError("Venue", venue_id)
 
         await self.session.delete(db_venue)
         await self.session.flush()

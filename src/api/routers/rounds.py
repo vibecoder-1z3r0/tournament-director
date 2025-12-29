@@ -68,13 +68,6 @@ async def pair_round_endpoint(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"Round {round_number} already has pairings",
             )
-        # Round exists but no matches yet - use existing round
-        round_obj = existing_round
-        create_new_round = False
-    else:
-        # Round doesn't exist - will create it
-        create_new_round = True
-        round_obj = None
 
     # Get tournament component (should exist after tournament start)
     components = await data_layer.components.list_by_tournament(tournament_id)
@@ -106,8 +99,12 @@ async def pair_round_endpoint(
         config = component.config or {}
         matches = pair_round(registrations, all_matches, component, config, round_number)
 
-    # Create round object if needed
-    if create_new_round:
+    # Create or use existing round
+    if existing_round:
+        # Round exists but no matches - use existing round
+        created_round = existing_round
+    else:
+        # Create new round
         round_obj = Round(
             id=uuid4(),
             tournament_id=tournament_id,
@@ -117,8 +114,6 @@ async def pair_round_endpoint(
             status=RoundStatus.ACTIVE,
         )
         created_round = await data_layer.rounds.create(round_obj)
-    else:
-        created_round = round_obj
 
     # Set round_id and save matches
     for match in matches:

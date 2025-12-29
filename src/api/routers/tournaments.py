@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, status
 
 from src.data.exceptions import DuplicateError, NotFoundError
 from src.lifecycle import end_tournament, start_tournament
-from src.models.base import ComponentStatus, TournamentStatus
+from src.models.base import ComponentStatus, ComponentType, TournamentStatus
 from src.models.match import Component
 from src.models.tournament import (
     RegistrationControl,
@@ -265,7 +265,7 @@ async def start_tournament_endpoint(tournament_id: UUID, data_layer: DataLayerDe
             id=uuid4(),
             tournament_id=tournament_id,
             name="Swiss Component",
-            type="swiss",
+            type=ComponentType.SWISS,
             sequence_order=1,  # First component in tournament
             status=ComponentStatus.PENDING,
             config={"max_rounds": None},  # Will be determined by format or manual setting

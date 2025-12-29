@@ -86,20 +86,14 @@ warn_unreachable = true
 strict_equality = true
 
 [[tool.mypy.overrides]]
-module = ["pydantic.*", "aiofiles.*", "sqlalchemy.*", "fastapi.*", "uvicorn.*"]
+module = ["pydantic.*", "aiofiles.*", "sqlalchemy.*", "fastapi.*", "uvicorn.*", "toml.*"]
 ignore_missing_imports = true
 
-# TODO: Fix type errors in these modules (pre-existing from FastAPI/DB merge)
-# These are temporarily excluded to unblock CI
+# TODO: Fix TypeVar generic constraints in LocalDataLayer
+# These require Protocol-based type constraints for generic .id attribute access
 [[tool.mypy.overrides]]
-module = [
-    "src.data.database.repositories.*",
-    "src.data.local",
-    "src.api.*",
-    "src.lifecycle",
-    "src.logging_config",
-]
-ignore_errors = true
+module = ["src.data.local"]
+disable_error_code = ["attr-defined"]
 
 [tool.mypy.exclude]
 exclude = [

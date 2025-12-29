@@ -27,7 +27,7 @@ class DatabaseFormatRepository(FormatRepository):
         # Check for duplicate ID
         existing = await self.session.get(FormatModel, format_obj.id)
         if existing:
-            raise DuplicateError(f"Format with ID {format_obj.id} already exists")
+            raise DuplicateError("Format", "id", str(format_obj.id))
 
         db_format = FormatModel(
             id=format_obj.id,
@@ -49,7 +49,7 @@ class DatabaseFormatRepository(FormatRepository):
         """Get format by ID. Raises NotFoundError if not found."""
         db_format = await self.session.get(FormatModel, format_id)
         if not db_format:
-            raise NotFoundError(f"Format with ID {format_id} not found")
+            raise NotFoundError("Format", format_id)
 
         return Format(
             id=db_format.id,
@@ -132,7 +132,7 @@ class DatabaseFormatRepository(FormatRepository):
         """Update an existing format."""
         db_format = await self.session.get(FormatModel, format_obj.id)
         if not db_format:
-            raise NotFoundError(f"Format with ID {format_obj.id} not found")
+            raise NotFoundError("Format", format_obj.id)
 
         db_format.name = format_obj.name
         db_format.game_system = format_obj.game_system.value
@@ -150,7 +150,7 @@ class DatabaseFormatRepository(FormatRepository):
         """Delete a format. Raises NotFoundError if not found."""
         db_format = await self.session.get(FormatModel, format_id)
         if not db_format:
-            raise NotFoundError(f"Format with ID {format_id} not found")
+            raise NotFoundError("Format", format_id)
 
         await self.session.delete(db_format)
         await self.session.flush()

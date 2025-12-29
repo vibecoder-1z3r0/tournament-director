@@ -68,7 +68,9 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             # Split comma-separated string
             return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+        if isinstance(v, list):
+            return v
+        return [str(v)]  # Convert single value to list
 
     @field_validator("backend_type")
     @classmethod
@@ -167,20 +169,9 @@ def load_settings(
     # Use model_validate to create instance with our config_data without triggering
     # pydantic-settings automatic env var loading (since we handled it manually)
     if config_data:
-        # Merge with defaults for any missing fields
-        defaults = Settings.model_fields
-        full_config = {}
-        for field_name, field_info in defaults.items():
-            if field_name in config_data:
-                full_config[field_name] = config_data[field_name]
-            elif field_info.default is not None:
-                full_config[field_name] = field_info.default
-            elif field_info.default_factory is not None:
-                full_config[field_name] = field_info.default_factory()
-
         # Use model_construct to bypass pydantic-settings env loading
-        # Then validate the constructed model
-        instance = Settings.model_construct(**full_config)
+        # Pydantic will fill in defaults for missing fields
+        instance = Settings.model_construct(**config_data)
         # Validate the instance
         Settings.model_validate(instance)
         return instance

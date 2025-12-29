@@ -933,8 +933,8 @@ class LocalDataLayer(DataLayer):
 
                 for entity_data in entity_list:
                     # Convert dict to Pydantic model
-                    entity = model_class.model_validate(entity_data)  # type: ignore[attr-defined]
-                    await repository.create(entity)  # type: ignore[attr-defined]
+                    entity = model_class.model_validate(entity_data)
+                    await repository.create(entity)
 
     async def clear_all_data(self) -> None:
         """Clear all data from the data layer."""
