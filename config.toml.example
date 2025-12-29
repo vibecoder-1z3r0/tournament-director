@@ -1,0 +1,46 @@
+# Tournament Director API Configuration
+# Copy this file to config.toml and customize as needed
+#
+# Priority order: CLI args > env vars > config file > defaults
+#
+# AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0
+
+# Application Settings
+title = "Tournament Director API"
+version = "0.1.0"
+debug = true
+
+# Server Settings
+host = "0.0.0.0"
+port = 8000
+reload = true
+
+# CORS Settings (comma-separated list)
+cors_origins = ["http://localhost:3000", "http://localhost:8080"]
+cors_allow_credentials = true
+
+# Backend Type: mock | local | sqlite | postgresql | mysql | mariadb
+backend_type = "mock"
+
+# Local Backend Configuration (only used when backend_type = "local")
+local_data_path = "./data"
+
+# Database Backend Configuration (only used when backend_type is a database)
+# SQLite (file-based)
+# database_url = "sqlite+aiosqlite:///./tournament.db"
+
+# SQLite (in-memory - for testing)
+# database_url = "sqlite+aiosqlite:///:memory:"
+
+# PostgreSQL
+# database_url = "postgresql+asyncpg://user:password@localhost:5432/tournament_director"
+
+# MySQL
+# database_url = "mysql+aiomysql://user:password@localhost:3306/tournament_director"
+
+# MariaDB
+# database_url = "mariadb+aiomysql://user:password@localhost:3306/tournament_director"
+
+# Pagination Settings
+default_page_size = 20
+max_page_size = 100

@@ -33,19 +33,36 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     Handles initialization and cleanup of resources like database connections.
     """
+    from src.api.config import config
+    from src.api.dependencies import get_data_layer
+    from src.data.database.data_layer import DatabaseDataLayer
+
     # Startup
     print("🚀 Tournament Director API starting...")
+    print(f"   Backend: {config.backend_type}")
 
-    # TODO: Initialize database connection pool when database backend is implemented
-    # await app.state.db.connect()
+    # Initialize data layer (creates singleton)
+    data_layer = get_data_layer()
+
+    # Initialize database backend if configured
+    if isinstance(data_layer, DatabaseDataLayer):
+        print(f"   Database: {config.database_url}")
+        await data_layer.initialize()
+        print("   ✅ Database initialized")
+    elif config.backend_type == "local":
+        print(f"   Data directory: {config.local_data_path}")
+    else:
+        print("   Using in-memory mock backend")
 
     yield
 
     # Shutdown
     print("👋 Tournament Director API shutting down...")
 
-    # TODO: Close database connections when database backend is implemented
-    # await app.state.db.disconnect()
+    # Close database connections if using database backend
+    if isinstance(data_layer, DatabaseDataLayer):
+        await data_layer.db.close()
+        print("   ✅ Database connections closed")
 
 
 # Create FastAPI application
@@ -70,11 +87,13 @@ app = FastAPI(
     openapi_url="/openapi.json",
 )
 
-# Configure CORS
+# Configure CORS from settings
+from src.api.config import config as api_config
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # TODO: Configure for production
-    allow_credentials=True,
+    allow_origins=api_config.cors_origins,
+    allow_credentials=api_config.cors_allow_credentials,
     allow_methods=["*"],
     allow_headers=["*"],
 )

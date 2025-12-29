@@ -3,7 +3,9 @@
 
 # Core dependencies
 pydantic==2.8.2
+pydantic-settings==2.5.2  # Settings management with env var support
 aiofiles==24.1.0
+toml==0.10.2              # TOML config file parsing
 
 # API Framework
 fastapi==0.115.0

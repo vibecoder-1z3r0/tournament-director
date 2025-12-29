@@ -10,10 +10,9 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from src.api.backend_factory import create_data_layer
 from src.api.config import config
 from src.data.interface import DataLayer
-from src.data.local import LocalDataLayer
-from src.data.mock import MockDataLayer
 
 # Singleton data layer instance
 _data_layer: DataLayer | None = None
@@ -23,19 +22,21 @@ def get_data_layer() -> DataLayer:
     """
     Get data layer instance (singleton).
 
-    Returns the configured data layer backend (mock, local, or database).
+    Returns the configured data layer backend based on configuration.
+    Supports mock, local (JSON), and database (SQLite, PostgreSQL, MySQL, MariaDB) backends.
+
+    The backend is determined by the backend_type configuration setting, which can be set via:
+    - Environment variable: TD_BACKEND_TYPE
+    - Config file (TOML)
+    - CLI arguments (when using CLI tool)
+    - Default: "mock"
+
     Creates the instance on first call and reuses it for subsequent calls.
     """
     global _data_layer
 
     if _data_layer is None:
-        if config.data_backend == "mock":
-            _data_layer = MockDataLayer()
-        elif config.data_backend == "local":
-            _data_layer = LocalDataLayer(config.local_data_path)
-        else:
-            # TODO: Add database backend when implemented
-            raise NotImplementedError(f"Backend '{config.data_backend}' not yet implemented")
+        _data_layer = create_data_layer(config)
 
     return _data_layer
 
