@@ -9,6 +9,7 @@ AIA EAI Hin R Claude Code [Sonnet 4.5] v1.0
 from uuid import uuid4
 
 import pytest
+import pytest_asyncio
 
 from src.api.backend_factory import create_data_layer
 from src.api.config import Settings
@@ -38,7 +39,8 @@ class TestBackendFactory:
         assert data_layer.players is not None
         assert data_layer.tournaments is not None
 
-    def test_create_sqlite_backend(self):
+    @pytest.mark.asyncio
+    async def test_create_sqlite_backend(self):
         """Should create DatabaseDataLayer for SQLite."""
         settings = Settings(
             backend_type="sqlite",
@@ -46,11 +48,17 @@ class TestBackendFactory:
         )
         data_layer = create_data_layer(settings)
 
-        assert isinstance(data_layer, DatabaseDataLayer)
-        # Note: Database backend requires initialization before use
-        # Repository access is tested in TestBackendFactoryInitialization
+        try:
+            assert isinstance(data_layer, DatabaseDataLayer)
+            # Note: Database backend requires initialization before use
+            # Repository access is tested in TestBackendFactoryInitialization
+        finally:
+            # Clean up database connections
+            if isinstance(data_layer, DatabaseDataLayer):
+                await data_layer.close()
 
-    def test_create_postgresql_backend(self):
+    @pytest.mark.asyncio
+    async def test_create_postgresql_backend(self):
         """Should create DatabaseDataLayer for PostgreSQL."""
         settings = Settings(
             backend_type="postgresql",
@@ -58,10 +66,16 @@ class TestBackendFactory:
         )
         data_layer = create_data_layer(settings)
 
-        assert isinstance(data_layer, DatabaseDataLayer)
-        # Note: Database backend requires initialization before use
+        try:
+            assert isinstance(data_layer, DatabaseDataLayer)
+            # Note: Database backend requires initialization before use
+        finally:
+            # Clean up database connections
+            if isinstance(data_layer, DatabaseDataLayer):
+                await data_layer.close()
 
-    def test_create_mysql_backend(self):
+    @pytest.mark.asyncio
+    async def test_create_mysql_backend(self):
         """Should create DatabaseDataLayer for MySQL (requires aiomysql)."""
         try:
             import aiomysql  # noqa: F401
@@ -74,9 +88,15 @@ class TestBackendFactory:
         )
         data_layer = create_data_layer(settings)
 
-        assert isinstance(data_layer, DatabaseDataLayer)
+        try:
+            assert isinstance(data_layer, DatabaseDataLayer)
+        finally:
+            # Clean up database connections
+            if isinstance(data_layer, DatabaseDataLayer):
+                await data_layer.close()
 
-    def test_create_mariadb_backend(self):
+    @pytest.mark.asyncio
+    async def test_create_mariadb_backend(self):
         """Should create DatabaseDataLayer for MariaDB (requires aiomysql)."""
         try:
             import aiomysql  # noqa: F401
@@ -89,9 +109,15 @@ class TestBackendFactory:
         )
         data_layer = create_data_layer(settings)
 
-        assert isinstance(data_layer, DatabaseDataLayer)
+        try:
+            assert isinstance(data_layer, DatabaseDataLayer)
+        finally:
+            # Clean up database connections
+            if isinstance(data_layer, DatabaseDataLayer):
+                await data_layer.close()
 
-    def test_database_backends_use_database_url(self):
+    @pytest.mark.asyncio
+    async def test_database_backends_use_database_url(self):
         """Database backends should use database_url from settings."""
         settings = Settings(
             backend_type="sqlite",
@@ -99,8 +125,13 @@ class TestBackendFactory:
         )
         data_layer = create_data_layer(settings)
 
-        assert isinstance(data_layer, DatabaseDataLayer)
-        assert data_layer.db.database_url == "sqlite+aiosqlite:///./custom.db"
+        try:
+            assert isinstance(data_layer, DatabaseDataLayer)
+            assert data_layer.db.database_url == "sqlite+aiosqlite:///./custom.db"
+        finally:
+            # Clean up database connections
+            if isinstance(data_layer, DatabaseDataLayer):
+                await data_layer.close()
 
     def test_local_backend_uses_local_data_path(self, tmp_path):
         """Local backend should use local_data_path from settings."""
@@ -128,14 +159,20 @@ class TestBackendFactoryWithDefaults:
 
         assert isinstance(data_layer, MockDataLayer)  # Default is mock
 
-    def test_create_sqlite_with_default_url(self):
+    @pytest.mark.asyncio
+    async def test_create_sqlite_with_default_url(self):
         """Should use default SQLite URL if not specified."""
         settings = Settings(backend_type="sqlite")
         data_layer = create_data_layer(settings)
 
-        assert isinstance(data_layer, DatabaseDataLayer)
-        # Should have some default URL
-        assert data_layer.db.database_url is not None
+        try:
+            assert isinstance(data_layer, DatabaseDataLayer)
+            # Should have some default URL
+            assert data_layer.db.database_url is not None
+        finally:
+            # Clean up database connections
+            if isinstance(data_layer, DatabaseDataLayer):
+                await data_layer.close()
 
 
 @pytest.mark.asyncio
@@ -150,14 +187,19 @@ class TestBackendFactoryInitialization:
         )
         data_layer = create_data_layer(settings)
 
-        # Initialize should create tables
-        await data_layer.initialize()
+        try:
+            # Initialize should create tables
+            await data_layer.initialize()
 
-        # Verify we can use the backend
-        from src.models.player import Player
-        player = Player(id=uuid4(), name="Test Player")
-        created = await data_layer.players.create(player)
-        assert created.name == "Test Player"
+            # Verify we can use the backend
+            from src.models.player import Player
+            player = Player(id=uuid4(), name="Test Player")
+            created = await data_layer.players.create(player)
+            assert created.name == "Test Player"
+        finally:
+            # Clean up database connections
+            if isinstance(data_layer, DatabaseDataLayer):
+                await data_layer.close()
 
     async def test_initialize_mock_backend_is_noop(self):
         """Mock backend initialize should be a no-op."""
